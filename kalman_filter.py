@@ -19,7 +19,43 @@ class KalmanFilter:
         self.car = car
 
         # BEGIN_YOUR_CODE ######################################################
-        raise NotImplementedError
+
+        # [x, y, vx, vy] -> [x + vx*dt, y + vy*dt, vx, vy]
+        dt = 1 
+        self.kf.F = np.array([
+            [1, 0, dt, 0], 
+            [0, 1, 0, dt], 
+            [0, 0, 1,  0],  
+            [0, 0, 0,  1]   
+        ])
+
+        self.kf.H = np.array([
+            [1, 0, 0, 0], 
+            [0, 1, 0, 0]   
+        ])
+
+        self.kf.R = np.array([
+            [variance, 0], 
+            [0, variance]
+        ])
+
+        process_noise_std = 1
+        self.kf.Q = np.array([
+            [process_noise_std, 0, 0, 0],
+            [0, process_noise_std, 0, 0],
+            [0, 0, process_noise_std, 0],
+            [0, 0, 0, process_noise_std]
+        ])
+
+        self.kf.x = np.array([
+            car.pos[0],  
+            car.pos[1], 
+            0,          
+            0            
+        ])
+
+        self.kf.P = np.eye(4) * 1000 
+        
 
         # END_YOUR_CODE ########################################################
 
@@ -33,7 +69,18 @@ class KalmanFilter:
         # Prediction step
         
         # BEGIN_YOUR_CODE ######################################################
-        raise NotImplementedError
+        self.kf.predict()
+        
+        if which == "gaussian":
+            self.kf.R = np.array([[self.variance, 0],
+                                [0, self.variance]]) 
+        elif which == "uniform":
+            uniform_variance = (self.width ** 2) / 12 
+            self.kf.R = np.array([[uniform_variance, 0],
+                                [0, uniform_variance]])  
+        self.kf.update(measurement)
+
+        self.check_collision(other_car)
         
         # END_YOUR_CODE ########################################################
 

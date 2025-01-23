@@ -70,7 +70,11 @@ class ParticleFilter:
         particles = []
 
         # BEGIN_YOUR_CODE ######################################################
-        raise NotImplementedError
+        for _ in range(self.num_particles):
+            pos = np.array([random.uniform(self.minx, self.maxx), random.uniform(self.miny, self.maxy)])
+            orient = np.random.uniform(-1, 1, 2)
+            orient /= np.linalg.norm(orient)  # Normalize orientation
+            particles.append(Particle(pos, orient))
         
         # END_YOUR_CODE ########################################################
 
@@ -108,7 +112,28 @@ class ParticleFilter:
         new_particles = []
 
         # BEGIN_YOUR_CODE ######################################################
-        raise NotImplementedError
+        for i in range(self.num_particles):
+            self.particles[i] = self.transition_sample(self.particles[i], delta_angle, speed)
+        
+        weights = []
+        for particle in self.particles:
+            weight = self.compute_prenorm_weight(particle, sensor, max_sensor_range, sensor_std, evidence)
+            weights.append(weight)
+
+        # Normalize weights
+        total_weight = sum(weights)
+        if total_weight > 0:
+            weights = [w / total_weight for w in weights]
+        else:
+            weights = [1.0 / self.num_particles] * self.num_particles  
+
+        new_particles = []
+        cumulative_weights = np.cumsum(weights) 
+        for _ in range(self.num_particles):
+            rand = random.uniform(0, 1)
+            index = np.searchsorted(cumulative_weights, rand)
+            new_particles.append(copy.deepcopy(self.particles[index]))
+
         #Hint: when computing the weights of each particle, you will probably want
         # to use compute_prenorm_weight to compute an unnormalized weight for each
         # particle individually, and then normalize the weights of all the particles
@@ -125,7 +150,11 @@ class ParticleFilter:
         """
         weight = None
         # BEGIN_YOUR_CODE ######################################################
-        raise NotImplementedError
+        x, y = float(particle.pos[0]), float(particle.pos[1])
+        particle_readings = sensor(x, y, max_sensor_range)
+        
+        weight = weight_gaussian_kernel(particle_readings, evidence, std=sensor_std)
+
         #Hint: use the weight_gaussian_kernel method
 
         
@@ -138,7 +167,20 @@ class ParticleFilter:
         """
         new_particle = None
         # BEGIN_YOUR_CODE ######################################################
-        raise NotImplementedError
+        #rotate the orientation by delta_angle
+        cos_angle = np.cos(delta_angle)
+        sin_angle = np.sin(delta_angle)
+        rotation_matrix = np.array([[cos_angle, -sin_angle], [sin_angle, cos_angle]])
+        new_orient = np.dot(rotation_matrix, particle.orient)
+
+        new_pos = particle.pos + new_orient * speed
+
+        #add noise 
+        noisy_particle = Particle(new_pos, new_orient)
+        noisy_particle.add_noise(std_pos=1.0, std_orient=0.1)
+        self.fix_particle(noisy_particle)
+
+        return noisy_particle
         #Hint: rotate the orientation by delta_angle, and then move in that
         # direction at the given speed over 1 unit of time. You will need to add
         # noise at the end to simulate stochasticity in dynamics
@@ -175,7 +217,7 @@ class ParticleFilter:
         
         return new_particles
 
-def weight_gaussian_kernel(x1, x2, std = 500):
+def weight_gaussian_kernel(x1, x2, std = 50):
     """
     Returns the gaussian kernel of the distance between vectors x1 and x2
     std: controls the shape of the gaussian, i.e. controls how much you penalize
